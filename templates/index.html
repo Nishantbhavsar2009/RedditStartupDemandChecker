@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Validate startup product demand by scraping and analyzing Reddit posts using rule-based heuristics and Gemini AI analysis.">
+    <title>REDDIT STARTUP DEMAND CHECKER - RESEARCH CONSOLE v1.0</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-main: #0c0d10;
+            --bg-panel: #13161c;
+            --bg-input: #1a1e26;
+            --border-industrial: #ffaa00;
+            --border-glow: rgba(255, 170, 0, 0.2);
+            --border-muted: #2a313d;
+            --text-primary: #f1f5f9;
+            --text-muted: #64748b;
+            --accent-ok: #10b981;
+            --accent-warn: #f59e0b;
+            --accent-err: #ef4444;
+            --font-display: 'Share Tech Mono', monospace;
+            --font-body: 'JetBrains Mono', monospace;
+            --scanline: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            ), linear-gradient(
+                90deg, 
+                rgba(255, 0, 0, 0.06), 
+                rgba(0, 255, 0, 0.02), 
+                rgba(0, 0, 255, 0.06)
+            );
+        }
+
+        /* Basic Reset & Typography */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 14px;
+            line-height: 1.5;
+            padding: 20px;
+            overflow-x: hidden;
+            background-image: radial-gradient(circle at 50% 50%, #151b24 0%, #0c0d10 100%);
+            min-height: 100vh;
+        }
+
+        /* CRT Scanline overlay effect */
+        body::after {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: var(--scanline);
+            background-size: 100% 4px, 6px 100%;
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0.15;
+        }
+
+        /* Layout Framework */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Top Bar Header */
+        header {
+            border: 2px solid var(--border-muted);
+            background-color: var(--bg-panel);
+            padding: 15px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background-color: var(--border-industrial);
+        }
+
+        .header-title {
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1 {
+            font-family: var(--font-display);
+            font-size: 24px;
+            font-weight: normal;
+            color: var(--border-industrial);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px var(--border-glow);
+        }
+
+        .header-subtitle {
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-family: var(--font-display);
+            font-size: 12px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-ok);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-ok);
+            animation: pulse 1.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            100% { opacity: 1; }
+        }
+
+        /* Dashboard Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Sidebar Panels */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background-color: var(--bg-panel);
+            border: 2px solid var(--border-muted);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+        }
+
+        .panel.highlighted {
+            border-color: var(--border-industrial);
+            box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.05), 0 0 10px var(--border-glow);
+        }
+
+        .panel-header {
+            font-family: var(--font-display);
+            font-size: 16px;
+            color: var(--border-industrial);
+            border-bottom: 1px solid var(--border-muted);
+            padding-bottom: 8px;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Form Controls */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-family: var(--font-display);
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        input[type="text"], input[type="password"], select, textarea {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-muted);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 13px;
+            padding: 10px 12px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus, select:focus, textarea:focus {
+            border-color: var(--border-industrial);
+            box-shadow: 0 0 5px var(--border-glow);
+        }
+
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .checkbox-item input {
+            accent-color: var(--border-industrial);
+        }
+
+        /* Button design */
+        .btn {
+            background-color: transparent;
+            border: 2px solid var(--border-industrial);
+            color: var(--border-industrial);
+            font-family: var(--font-display);
+            font-size: 14px;
+            text-transform: uppercase;
+            padding: 12px;
+            cursor: pointer;
+            letter-spacing: 1px;
+            transition: background-color 0.2s, color 0.2s;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background-color: var(--border-industrial);
+            color: var(--bg-main);
+            box-shadow: 0 0 10px var(--border-glow);
+        }
+
+        .btn:active {
+            filter: brightness(0.9);
+        }
+
+        .btn:disabled {
+            border-color: var(--border-muted);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            background-color: transparent;
+            box-shadow: none;
+        }
+
+        /* System History List */
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            padding: 10px;
+            border: 1px solid var(--border-muted);
+            background-color: var(--bg-input);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+
+        .history-item:hover {
+            border-color: var(--border-industrial);
+            background-color: rgba(255, 170, 0, 0.03);
+        }
+
+        .history-item.active {
+            border-color: var(--border-industrial);
+            background-color: rgba(255, 170, 0, 0.08);
+        }
+
+        .history-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .history-title {
+            font-family: var(--font-display);
+            font-size: 13px;
+            color: var(--text-primary);
+        }
+
+        .history-date {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .history-badge {
+            font-family: var(--font-display);
+            padding: 2px 6px;
+            font-size: 12px;
+            border: 1px solid var(--border-muted);
+        }
+
+        .badge-high { color: var(--accent-ok); border-color: var(--accent-ok); }
+        .badge-mod { color: var(--accent-warn); border-color: var(--accent-warn); }
+        .badge-low { color: var(--text-muted); border-color: var(--text-muted); }
+
+        /* Main Workspace Right Panel */
+        .workspace {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Terminal Console Screen Log */
+        .console-screen {
+            background-color: #06070a;
+            border: 2px solid var(--border-muted);
+            font-family: var(--font-body);
+            padding: 15px;
+            height: 180px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.9);
+            position: relative;
+        }
+
+        .console-screen.active {
+            border-color: var(--border-industrial);
+        }
+
+        .console-line {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .console-line.sys { color: var(--border-industrial); }
+        .console-line.scrap { color: #38bdf8; }
+        .console-line.anal { color: #a855f7; }
+        .console-line.ok { color: var(--accent-ok); }
+        .console-line.err { color: var(--accent-err); }
+
+        /* Report Output Display */
+        .report-display {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Welcome Message Screen */
+        .welcome-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 80px 20px;
+            text-align: center;
+            border: 2px dashed var(--border-muted);
+            background-color: var(--bg-panel);
+            gap: 15px;
+        }
+
+        .welcome-icon {
+            font-size: 48px;
+            color: var(--border-industrial);
+            text-shadow: 0 0 10px var(--border-glow);
+            font-family: var(--font-display);
+        }
+
+        /* Detailed Report Grid */
+        .report-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        /* Score & Overview Grid card */
+        .score-card {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            gap: 20px;
+            border: 2px solid var(--border-industrial);
+            background-color: var(--bg-panel);
+            padding: 20px;
+            box-shadow: 0 0 10px var(--border-glow);
+        }
+
+        @media (max-width: 768px) {
+            .score-card {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .gauge-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            border-right: 1px solid var(--border-muted);
+            padding-right: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .gauge-container {
+                border-right: none;
+                border-bottom: 1px solid var(--border-muted);
+                padding-right: 0;
+                padding-bottom: 20px;
+            }
+        }
+
+        .score-circle {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            border: 8px double var(--border-industrial);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 15px var(--border-glow);
+            background-color: var(--bg-main);
+        }
+
+        .score-num {
+            font-family: var(--font-display);
+            font-size: 40px;
+            color: var(--border-industrial);
+            font-weight: bold;
+            line-height: 1;
+        }
+
+        .score-pct {
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        .score-lbl {
+            font-family: var(--font-display);
+            font-size: 13px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            background-color: rgba(255, 170, 0, 0.1);
+            border: 1px solid var(--border-industrial);
+            margin-top: 5px;
+        }
+
+        .overview-details {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .summary-box {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+
+        .summary-box strong {
+            color: var(--border-industrial);
+        }
+
+        /* Metric Progress Bars */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 500px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .metric-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background-color: var(--bg-input);
+            padding: 10px;
+            border: 1px solid var(--border-muted);
+        }
+
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--font-display);
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .metric-val {
+            color: var(--text-primary);
+            font-weight: bold;
+        }
+
+        .progress-bar-bg {
+            height: 6px;
+            background-color: var(--bg-panel);
+            width: 100%;
+            border: 1px solid var(--border-muted);
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background-color: var(--border-industrial);
+            box-shadow: 0 0 5px var(--border-industrial);
+        }
+
+        /* Detailed Findings Cards */
+        .findings-card {
+            border: 2px solid var(--border-muted);
+            background-color: var(--bg-panel);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .findings-title {
+            font-family: var(--font-display);
+            font-size: 15px;
+            color: var(--border-industrial);
+            border-bottom: 1px dashed var(--border-muted);
+            padding-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .findings-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .finding-item {
+            padding: 12px;
+            border-left: 3px solid var(--border-industrial);
+            background-color: var(--bg-input);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        /* Competitors list grid */
+        .competitor-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .comp-badge {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-muted);
+            padding: 6px 12px;
+            font-family: var(--font-display);
+            color: var(--text-primary);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .comp-badge::before {
+            content: '♦';
+            color: var(--border-industrial);
+        }
+
+        /* Loader Overlay animation */
+        .loader-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(12, 13, 16, 0.85);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            font-family: var(--font-display);
+            font-size: 18px;
+            color: var(--border-industrial);
+            border: 2px solid var(--border-industrial);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid var(--border-muted);
+            border-top: 4px solid var(--border-industrial);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-main);
+            border-left: 1px solid var(--border-muted);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-muted);
+            border: 1px solid var(--bg-main);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-industrial);
+        }
+
+        /* Hide elements helper */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Main Research Console Header -->
+    <header>
+        <div class="header-title">
+            <h1>Reddit Startup Demand Checker</h1>
+            <div class="header-subtitle">System Command Console v1.0 // CBSE CS-AI Portfolio Edition</div>
+        </div>
+        <div class="system-status">
+            <div class="status-indicator"></div>
+            <span>CONSOLE STATUS: OPERATIONAL</span>
+        </div>
+    </header>
+
+    <div class="dashboard-grid">
+        <!-- Sidebar Controls & Input -->
+        <aside class="sidebar">
+            <div class="panel highlighted" id="search-panel">
+                <div class="panel-header">
+                    <span>Target Concept</span>
+                </div>
+                
+                <form id="analyze-form">
+                    <div class="form-group">
+                        <label for="input-idea">Startup Idea / Name</label>
+                        <input type="text" id="input-idea" required placeholder="e.g. Personal CRM / Friendly Hub" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 8px;">
+                        <label for="input-keywords">Search Keywords</label>
+                        <input type="text" id="input-keywords" required placeholder="e.g. personal crm, friendship notebook" autocomplete="off">
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 8px;">
+                        <label>Target Subreddits</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="subreddits" value="SideProject" checked> r/SideProject
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="subreddits" value="startups" checked> r/startups
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="subreddits" value="saas" checked> r/saas
+                            </label>
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="subreddits" value="entrepreneur" checked> r/entrepreneur
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 8px;">
+                        <label for="input-key">Gemini API Key (Optional)</label>
+                        <input type="password" id="input-key" placeholder="Enter key for deep AI analysis..." autocomplete="off">
+                    </div>
+
+                    <button type="submit" class="btn" id="btn-submit" style="margin-top: 15px; width: 100%;">
+                        Run Market Validation
+                    </button>
+                </form>
+                
+                <!-- Inner Loader Screen -->
+                <div class="loader-overlay hidden" id="panel-loader">
+                    <div class="spinner"></div>
+                    <span id="loader-msg">SCANNING REDDIT...</span>
+                </div>
+            </div>
+
+            <!-- History Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>Saved Reports</span>
+                </div>
+                <div class="history-list" id="saved-reports-list">
+                    <!-- History items will be populated dynamically -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            <!-- Terminal Screen logs -->
+            <div class="console-screen" id="terminal-screen">
+                <div class="console-line sys">[SYSTEM INITIALIZATION DONE]</div>
+                <div class="console-line sys">Ready to receive query request. Enter concept parameters and execute.</div>
+            </div>
+
+            <!-- Dynamic Report Display Area -->
+            <div class="report-display" id="report-view-container">
+                <!-- Welcome/Initial Screen -->
+                <div class="welcome-screen" id="welcome-message-screen">
+                    <div class="welcome-icon">⚡ STATUS: IDLE ⚡</div>
+                    <p style="color: var(--text-muted); font-size: 13px; max-width: 450px;">
+                        No analysis report selected. Initialize a new search on the left panel or click a saved report from history to inspect results.
+                    </p>
+                </div>
+
+                <!-- Report Details Screen (Hidden by default) -->
+                <div class="report-layout hidden" id="report-details-layout">
+                    <!-- Score Card Grid -->
+                    <div class="score-card">
+                        <div class="gauge-container">
+                            <div class="score-circle">
+                                <div class="score-num" id="report-score-value">--</div>
+                                <div class="score-pct">/ 100</div>
+                            </div>
+                            <div class="score-lbl" id="report-interest-level">--</div>
+                        </div>
+                        <div class="overview-details">
+                            <div class="panel-header" style="border: none; padding: 0;">
+                                <span id="report-idea-title">REPORT SUMMARY</span>
+                                <span style="font-size: 11px; color: var(--text-muted);" id="report-time-stamp">--</span>
+                            </div>
+                            
+                            <div class="summary-box" id="report-summary-text">
+                                Summary analysis content will be loaded here.
+                            </div>
+
+                            <div class="metrics-grid">
+                                <div class="metric-item">
+                                    <div class="metric-header">
+                                        <span>Post Volume</span>
+                                        <span class="metric-val" id="val-vol">0</span>
+                                    </div>
+                                    <div class="progress-bar-bg">
+                                        <div class="progress-bar-fill" id="fill-vol" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-header">
+                                        <span>Engagement</span>
+                                        <span class="metric-val" id="val-eng">0</span>
+                                    </div>
+                                    <div class="progress-bar-bg">
+                                        <div class="progress-bar-fill" id="fill-eng" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                                <div class="metric-item">
+                                    <div class="metric-header">
+                                        <span>Pain Signals</span>
+                                        <span class="metric-val" id="val-pain">0</span>
+                                    </div>
+                                    <div class="progress-bar-bg">
+                                        <div class="progress-bar-fill" id="fill-pain" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Key Pain Points Card -->
+                    <div class="findings-card">
+                        <div class="findings-title">Key Pain Points & User Frustrations</div>
+                        <div class="findings-list" id="report-pain-points-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Competitors & Features Row -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;" id="competitor-features-row">
+                        <div class="findings-card">
+                            <div class="findings-title">Competitors & Alternatives</div>
+                            <div class="competitor-badges" id="report-competitors-list">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        <div class="findings-card">
+                            <div class="findings-title">Suggested Product Features</div>
+                            <div class="findings-list" id="report-features-list">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+    // System elements references
+    const form = document.getElementById('analyze-form');
+    const inputIdea = document.getElementById('input-idea');
+    const inputKeywords = document.getElementById('input-keywords');
+    const inputKey = document.getElementById('input-key');
+    const btnSubmit = document.getElementById('btn-submit');
+    const terminalScreen = document.getElementById('terminal-screen');
+    const welcomeScreen = document.getElementById('welcome-message-screen');
+    const reportLayout = document.getElementById('report-details-layout');
+    const panelLoader = document.getElementById('panel-loader');
+    const loaderMsg = document.getElementById('loader-msg');
+    const searchPanel = document.getElementById('search-panel');
+    const savedReportsList = document.getElementById('saved-reports-list');
+    
+    // Report fields references
+    const rIdeaTitle = document.getElementById('report-idea-title');
+    const rTimestamp = document.getElementById('report-time-stamp');
+    const rScoreValue = document.getElementById('report-score-value');
+    const rInterestLevel = document.getElementById('report-interest-level');
+    const rSummaryText = document.getElementById('report-summary-text');
+    const rValVol = document.getElementById('val-vol');
+    const rValEng = document.getElementById('val-eng');
+    const rValPain = document.getElementById('val-pain');
+    const rFillVol = document.getElementById('fill-vol');
+    const rFillEng = document.getElementById('fill-eng');
+    const rFillPain = document.getElementById('fill-pain');
+    const rPainList = document.getElementById('report-pain-points-list');
+    const rCompetitorsList = document.getElementById('report-competitors-list');
+    const rFeaturesList = document.getElementById('report-features-list');
+    const rCompFeaturesRow = document.getElementById('competitor-features-row');
+
+    // Load API Key from local storage if previously saved (convenience)
+    const savedApiKey = localStorage.getItem('gemini_api_key');
+    if (savedApiKey) {
+        inputKey.value = savedApiKey;
+    }
+
+    // Function to append console lines
+    function logToTerminal(message, type = 'sys') {
+        const line = document.createElement('div');
+        const now = new Date();
+        const timeStr = now.toTimeString().split(' ')[0];
+        line.className = `console-line ${type}`;
+        line.textContent = `[${timeStr}] ${message}`;
+        terminalScreen.appendChild(line);
+        terminalScreen.scrollTop = terminalScreen.scrollHeight;
+    }
+
+    // Initialize list of saved reports
+    async function loadReportsHistory() {
+        try {
+            const res = await fetch('/reports');
+            if (!res.ok) throw new Error("Failed to fetch reports");
+            const reports = await res.json();
+            
+            savedReportsList.innerHTML = '';
+            if (reports.length === 0) {
+                savedReportsList.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 10px; font-size: 11px;">NO SAVED REPORTS</div>';
+                return;
+            }
+            
+            reports.forEach(rep => {
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                item.setAttribute('data-id', rep.id);
+                
+                const score = rep.overall_score;
+                let badgeClass = 'badge-low';
+                let levelText = 'LOW';
+                if (score >= 75) {
+                    badgeClass = 'badge-high';
+                    levelText = 'HIGH';
+                } else if (score >= 50) {
+                    badgeClass = 'badge-mod';
+                    levelText = 'MOD';
+                }
+                
+                const date = new Date(rep.timestamp);
+                const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                
+                item.innerHTML = `
+                    <div class="history-info">
+                        <span class="history-title">${escapeHtml(rep.idea)}</span>
+                        <span class="history-date">${dateStr}</span>
+                    </div>
+                    <span class="history-badge ${badgeClass}">${score} ${levelText}</span>
+                `;
+                
+                item.addEventListener('click', () => loadReportDetails(rep.id));
+                savedReportsList.appendChild(item);
+            });
+        } catch (err) {
+            console.error(err);
+            logToTerminal(`ERROR: Failed loading saved reports history.`, 'err');
+        }
+    }
+
+    // Load full report details
+    async function loadReportDetails(id) {
+        // Highlight active item
+        document.querySelectorAll('.history-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.getAttribute('data-id') == id) {
+                item.classList.add('active');
+            }
+        });
+
+        logToTerminal(`SYSTEM: Loading report ID ${id}...`, 'sys');
+        
+        try {
+            const res = await fetch(`/reports/${id}`);
+            if (!res.ok) throw new Error("Report details fetch failed");
+            const data = await res.json();
+            
+            displayReport(data);
+            logToTerminal(`SYSTEM: Successfully loaded report for '${data.idea}'`, 'ok');
+        } catch (err) {
+            logToTerminal(`ERROR: Failed fetching report ID ${id}: ${err.message}`, 'err');
+        }
+    }
+
+    // Helper to format HTML escaping
+    function escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // Display report data in UI
+    function displayReport(data) {
+        const report = data.report;
+        
+        welcomeScreen.classList.add('hidden');
+        reportLayout.classList.remove('hidden');
+        
+        rIdeaTitle.textContent = `${data.idea.toUpperCase()} VALIDATION REPORT`;
+        
+        const date = new Date(data.timestamp);
+        rTimestamp.textContent = `TS: ${date.toLocaleString()}`;
+        
+        rScoreValue.textContent = report.overall_score;
+        rInterestLevel.textContent = report.interest_level;
+        
+        // Interest level badge styling
+        rInterestLevel.className = 'score-lbl';
+        if (report.overall_score >= 75) {
+            rInterestLevel.style.color = 'var(--accent-ok)';
+            rInterestLevel.style.borderColor = 'var(--accent-ok)';
+            rInterestLevel.style.backgroundColor = 'rgba(16, 185, 129, 0.1)';
+        } else if (report.overall_score >= 50) {
+            rInterestLevel.style.color = 'var(--accent-warn)';
+            rInterestLevel.style.borderColor = 'var(--accent-warn)';
+            rInterestLevel.style.backgroundColor = 'rgba(245, 158, 11, 0.1)';
+        } else {
+            rInterestLevel.style.color = 'var(--text-muted)';
+            rInterestLevel.style.borderColor = 'var(--border-muted)';
+            rInterestLevel.style.backgroundColor = 'rgba(100, 116, 139, 0.1)';
+        }
+        
+        rSummaryText.innerHTML = `<strong>OPPORTUNITY SUMMARY:</strong> ${escapeHtml(report.ai_summary)}`;
+        
+        // Progress Bars
+        rValVol.textContent = report.volume_score;
+        rFillVol.style.width = `${report.volume_score * 10}%`;
+        
+        rValEng.textContent = report.engagement_score;
+        rFillEng.style.width = `${report.engagement_score * 10}%`;
+        
+        rValPain.textContent = report.pain_score;
+        rFillPain.style.width = `${report.pain_score * 10}%`;
+        
+        // Render Pain Points
+        rPainList.innerHTML = '';
+        if (report.key_pain_points && report.key_pain_points.length > 0) {
+            report.key_pain_points.forEach(pt => {
+                const div = document.createElement('div');
+                div.className = 'finding-item';
+                div.textContent = pt;
+                rPainList.appendChild(div);
+            });
+        } else {
+            rPainList.innerHTML = '<div style="color: var(--text-muted)">No specific pain points extracted.</div>';
+        }
+        
+        // Render Competitors
+        rCompetitorsList.innerHTML = '';
+        if (report.competitors_mentioned && report.competitors_mentioned.length > 0) {
+            report.competitors_mentioned.forEach(comp => {
+                const badge = document.createElement('span');
+                badge.className = 'comp-badge';
+                badge.textContent = comp;
+                rCompetitorsList.appendChild(badge);
+            });
+        } else {
+            rCompetitorsList.innerHTML = '<span class="comp-badge">None identified</span>';
+        }
+
+        // Render Features (Only present if Gemini AI analysis was executed)
+        rFeaturesList.innerHTML = '';
+        if (report.suggested_features && report.suggested_features.length > 0) {
+            rCompFeaturesRow.style.gridTemplateColumns = '1fr 1fr';
+            rCompFeaturesRow.children[1].classList.remove('hidden');
+            report.suggested_features.forEach(feat => {
+                const div = document.createElement('div');
+                div.className = 'finding-item';
+                div.style.borderLeftColor = 'var(--accent-ok)';
+                div.textContent = feat;
+                rFeaturesList.appendChild(div);
+            });
+        } else {
+            // Hide features card if none provided (rule-based fallback only)
+            rCompFeaturesRow.style.gridTemplateColumns = '1fr';
+            rCompFeaturesRow.children[1].classList.add('hidden');
+        }
+    }
+
+    // Form Submit Event Handler
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const idea = inputIdea.value.trim();
+        const keywords = inputKeywords.value.trim();
+        const apiKey = inputKey.value.trim();
+        
+        // Gather selected subreddits
+        const subreddits = Array.from(document.querySelectorAll('input[name="subreddits"]:checked'))
+            .map(cb => cb.value);
+            
+        if (subreddits.length === 0) {
+            logToTerminal("ERROR: Select at least one target subreddit.", "err");
+            return;
+        }
+
+        // Save key to local storage
+        if (apiKey) {
+            localStorage.setItem('gemini_api_key', apiKey);
+        } else {
+            localStorage.removeItem('gemini_api_key');
+        }
+
+        // Disable input while loading
+        btnSubmit.disabled = true;
+        panelLoader.classList.remove('hidden');
+        searchPanel.style.borderColor = 'var(--border-industrial)';
+        terminalScreen.classList.add('active');
+        
+        logToTerminal(`SYSTEM: Running search request for '${idea}'...`, 'sys');
+        logToTerminal(`SCRAPER: Querying subreddits: r/${subreddits.join(', r/')}`, 'scrap');
+        
+        let logInterval = setInterval(() => {
+            const msgs = [
+                "Scraping active threads...",
+                "Retrieving post content parameters...",
+                "Decoding JSON headers...",
+                "Running heuristic NLP token matches...",
+                "Evaluating comment sentiment counts..."
+            ];
+            const randomMsg = msgs[Math.floor(Math.random() * msgs.length)];
+            logToTerminal(`SCRAPER: ${randomMsg}`, 'scrap');
+        }, 3000);
+
+        try {
+            loaderMsg.textContent = "SCRAPING REDDIT...";
+            
+            const payload = {
+                idea: idea,
+                keywords: keywords,
+                subreddits: subreddits,
+                api_key: apiKey || null
+            };
+            
+            const res = await fetch('/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            clearInterval(logInterval);
+            
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.detail || "Server error occurred");
+            }
+            
+            const data = await res.json();
+            
+            logToTerminal(`ANALYZER: Run complete. Analysis mode: ${data.report.analysis_type}`, 'anal');
+            logToTerminal(`SYSTEM: Saving results to local database...`, 'sys');
+            
+            // Reload sidebar list
+            await loadReportsHistory();
+            
+            // Show report detail
+            displayReport(data);
+            
+            logToTerminal(`SYSTEM: Success. Demand Score: ${data.report.overall_score}/100`, 'ok');
+            
+        } catch (err) {
+            clearInterval(logInterval);
+            logToTerminal(`ERROR: Run failed: ${err.message}`, 'err');
+        } finally {
+            btnSubmit.disabled = false;
+            panelLoader.classList.add('hidden');
+            terminalScreen.classList.remove('active');
+        }
+    });
+
+    // Initial page load triggers
+    window.addEventListener('DOMContentLoaded', () => {
+        loadReportsHistory();
+        logToTerminal("SYSTEM: Diagnostics checks complete. Network state online.", "ok");
+    });
+</script>
+</body>
+</html>
