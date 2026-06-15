@@ -78,3 +78,24 @@ def test_get_reports_empty(monkeypatch):
     data = response.json()
     assert len(data) == 1
     assert data[0]["idea"] == "Test"
+
+def test_analyze_endpoint_with_fallback():
+    """Verify end-to-end run of the analyze endpoint using the DDG fallback."""
+    payload = {
+        "idea": "AI Pomodoro Timer",
+        "keywords": "productivity pomodoro",
+        "subreddits": ["SideProject"],
+        "api_key": None
+    }
+    response = client.post("/analyze", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["idea"] == "AI Pomodoro Timer"
+    assert data["keywords"] == "productivity pomodoro"
+    assert "overall_score" in data
+    
+    report = data["report"]
+    assert "overall_score" in report
+    assert report["total_posts"] > 0
+
+
