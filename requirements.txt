@@ -4,3 +4,4 @@ httpx
 jinja2
 google-generativeai
 pytest
+ddgs

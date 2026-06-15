@@ -5,6 +5,46 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def fetch_reddit_posts_ddg_fallback(query: str, subreddit: str, limit: int = 15) -> list:
+    """
+    Fallback function using DuckDuckGo to search for Reddit posts from a specific subreddit.
+    This is triggered if Reddit's direct API blocks us (e.g., 403 Forbidden).
+    """
+    try:
+        from ddgs import DDGS
+    except ImportError:
+        logger.error("ddgs package not available for fallback search.")
+        return []
+
+    # Target specific subreddit on reddit
+    search_query = f"site:reddit.com/r/{subreddit} {query}"
+    logger.info(f"Attempting DDG fallback search for: '{search_query}'")
+    
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(search_query, max_results=limit))
+            posts = []
+            for r in results:
+                url = r.get("href", "")
+                if "reddit.com/r/" not in url:
+                    continue
+                
+                posts.append({
+                    "title": r.get("title", ""),
+                    "selftext": r.get("body", ""),
+                    "author": "anonymous",
+                    "score": 10,
+                    "num_comments": 5,
+                    "created_utc": time.time(),
+                    "url": url,
+                    "subreddit": subreddit
+                })
+            logger.info(f"DDG fallback successfully retrieved {len(posts)} posts for r/{subreddit}")
+            return posts
+    except Exception as e:
+        logger.error(f"Error during DDG fallback search: {e}")
+        return []
+
 def fetch_reddit_posts(query: str, subreddit: str = "SideProject", limit: int = 15) -> list:
     """
     Fetches search results from a specific subreddit using Reddit's public .json search API.
@@ -37,9 +77,14 @@ def fetch_reddit_posts(query: str, subreddit: str = "SideProject", limit: int = 
             
         if response.status_code != 200:
             logger.error(f"Failed to fetch from r/{subreddit}: HTTP {response.status_code}")
-            return []
+            return fetch_reddit_posts_ddg_fallback(query, subreddit, limit)
             
-        data = response.json()
+        try:
+            data = response.json()
+        except Exception as json_err:
+            logger.error(f"Failed to parse JSON response: {json_err}")
+            return fetch_reddit_posts_ddg_fallback(query, subreddit, limit)
+            
         posts = []
         
         children = data.get("data", {}).get("children", [])
@@ -61,7 +106,8 @@ def fetch_reddit_posts(query: str, subreddit: str = "SideProject", limit: int = 
         
     except Exception as e:
         logger.error(f"Error scraping r/{subreddit}: {str(e)}")
-        return []
+        return fetch_reddit_posts_ddg_fallback(query, subreddit, limit)
+
 
 def scrape_all_subreddits(query: str, subreddits: list = None, limit_per_sub: int = 10) -> list:
     """
